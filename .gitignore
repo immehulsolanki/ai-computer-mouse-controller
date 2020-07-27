@@ -1,0 +1,4 @@
+git_ign/
+.vscode/
+__pycache__/
+*tmp
