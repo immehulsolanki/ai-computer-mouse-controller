@@ -1,4 +1,5 @@
 git_ign/
 .vscode/
 __pycache__/
+venv_computer_pointer_control/
 *tmp
