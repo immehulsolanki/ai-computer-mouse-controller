@@ -1,14 +1,16 @@
 Following model downloaded using openvino 2019R3 model downloader[All precision]
 
-1. python downloader.py --name gaze-estimation-adas-0002 -o "outdirepath\git_ign\models\
+Usage[Windows10]: python yourpath/downloader.py --name modelname -o "yourpathtosavemodels\"
 
-2. python downloader.py --name face-detection-adas-binary-0001 -o "outdirepath\git_ign\models\
+1. python downloader.py --name gaze-estimation-adas-0002 -o "outdirepath\git_ign\models\"
 
-3. python downloader.py --name head-pose-estimation-adas-0001 -o "outdirepath\git_ign\models\
+2. python downloader.py --name face-detection-adas-binary-0001 -o "outdirepath\git_ign\models\"
 
-4. python downloader.py --name landmarks-regression-retail-0009 -o "outdirepath\git_ign\models\
+3. python downloader.py --name head-pose-estimation-adas-0001 -o "outdirepath\git_ign\models\"
 
-============================ OUPUT =========================================
+4. python downloader.py --name landmarks-regression-retail-0009 -o "outdirepath\git_ign\models\"
+
+============================ OUPUT WINDOWS10 =========================================
 
 C:\Program Files (x86)\IntelSWTools\openvino_2019.3.379\deployment_tools\open_model_zoo\tools\model_downloader>downloader.py --gaze-estimation-adas-0002 --precisions all -o "D:\edx\Intel_A_I\NanoDegree  Intel Edge AI for IoT Developers\Code and Project\ND_Computer Pointer Controller\git_ign\models\
 error: unrecognized arguments: --gaze-estimation-adas-0002
