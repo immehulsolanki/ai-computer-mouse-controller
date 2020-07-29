@@ -80,8 +80,10 @@ class face_detection:
         self.device_list = []
         self.print_once = True
         self.network_input_shape = None
+        self.filtered_result = [[]]
 
-        # ====== Load model files, verify model, and get the input shap parameters at start
+        # ====== Load model files, verify model, and get the input shap parameters at start ======
+        log.info("----- class Facedetection model ----")
         self.load_model()
         self.check_model()
         self.network_input_shape = self.get_input_shape()
@@ -205,34 +207,20 @@ class face_detection:
         #print(p_frame.shape) #Debug output
         return p_frame
 
-    def preprocess_output(self, input_frames_raw, result, input_frames_raw_width, input_frames_raw_height, prob_threshold):
-        '''
-        Draw bounding boxes onto the frame.
-        '''
-        countmultipeople = 0
-        for box in result[0][0]: # Output shape is 1x1x100x7
-            conf = box[2]
-            if conf >= prob_threshold:
-                countmultipeople += 1
-                xmin = int(box[3] * input_frames_raw_width)
-                ymin = int(box[4] * input_frames_raw_height)
-                xmax = int(box[5] * input_frames_raw_width)
-                ymax = int(box[6] * input_frames_raw_height)
-                # label = "Person"+str(countmultipeople)
-                cv2.rectangle(input_frames_raw, (xmin, ymin), (xmax, ymax), (0,0,255), 1) #main rect.
-                # cv2.rectangle(input_frames_raw, (xmin, ymin), (xmin+90, ymin+10), (0,0,255), -1) # Text rect.
-                # cv2.putText(input_frames_raw, label, (xmin,ymin+10),cv2.FONT_HERSHEY_PLAIN, 0.8, (0,0,255), 1)
-        return input_frames_raw, countmultipeople
-
-    def predict(self, input_frames_raw, input_frame_raw_height, input_frame_raw_width, prob_threshold):
+    def predict(self, input_frames_raw, input_frame_raw_height, input_frame_raw_width):
         '''
         TODO: You will need to complete this method.
         This method is meant for running predictions on the input image or video frame.
         input: RBG image in jpg format or video frame.
         '''
+        # pre-process origional frame to match network inputs.
         p_frame = self.preprocess_input(input_frames_raw, self.network_input_shape[3], self.network_input_shape[2])
+
+        # Run Async inference
         self.exec_network.start_async(request_id=0, #Origional
                 inputs={self.input_blob: p_frame}) # run inference
+
+        # wait until result available        
         if self.wait() == 0:
             ### the results of the inference request ###
             blob, result = self.get_output()
@@ -244,6 +232,5 @@ class face_detection:
                 for name, output_ in blob.items(): #Find the possible BLOBS for name, 
                     blob_list.append(name)
                 log.info("The name of available blob is: " + str(blob_list))
-                
-            p_frame, countmultipeople = self.preprocess_output(input_frames_raw, result, input_frame_raw_height, input_frame_raw_width, prob_threshold)
-            return p_frame, countmultipeople
+       
+            return result

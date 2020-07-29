@@ -26,6 +26,7 @@ from argparse import ArgumentParser
 from src.face_detection import face_detection
 from src.input_feeder import InputFeeder
 
+filtered_result_face_detection = [[]]
 
 # Initialize Log File, will save to current dir with datetime
 filenameis = "log_" + datetime.datetime.now().strftime("%Y%m%d%H%M%S") + ".txt"
@@ -110,6 +111,28 @@ def check_input_type(input):
     return input_type, error_flag, image_flag
 
 
+def process_output_face_detection(input_frames_raw, result, input_frames_raw_width, input_frames_raw_height, prob_threshold):
+        '''
+        Process results and Draw bounding boxes onto the frame.
+        '''
+        for i, box in enumerate(result[0][0]): # Output shape is 1x1x100x7
+            conf = box[2]
+            if conf >= prob_threshold:
+                xmin = int(box[3] * input_frames_raw_width)
+                ymin = int(box[4] * input_frames_raw_height)
+                xmax = int(box[5] * input_frames_raw_width)
+                ymax = int(box[6] * input_frames_raw_height)
+                print(filtered_result_face_detection)
+                filtered_result_face_detection[i] = [xmin, ymin, xmax, ymax]
+                # label = "Person"+str(countmultipeople)
+                cv2.rectangle(input_frames_raw, (xmin, ymin), (xmax, ymax), (0,0,255), 1) #main rect.
+                # cv2.rectangle(input_frames_raw, (xmin, ymin), (xmin+90, ymin+10), (0,0,255), -1) # Text rect.
+                # cv2.putText(input_frames_raw, label, (xmin,ymin+10),cv2.FONT_HERSHEY_PLAIN, 0.8, (0,0,255), 1)
+        print (filtered_result_face_detection)
+        return input_frames_raw, filtered_result_face_detection
+
+
+
 def infer(args):
     '''
     This function processes each model, run inference and controls the curser.
@@ -145,17 +168,21 @@ def infer(args):
             exit()
 
         key_pressed = cv2.waitKey(1)
+
         # face roi
-        f_frame, countmultipeople = detectFace.predict(input_frames_raw, input_frame_raw_width, input_frame_raw_height, args.prob_threshold) #HxW
+        result_face_detection = detectFace.predict(input_frames_raw, input_frame_raw_width, input_frame_raw_height) #HxW
+        # get filtered result with prob threshold    
+        face_frame, filtered_result_face_detection = process_output_face_detection(input_frames_raw, result_face_detection, input_frame_raw_width, input_frame_raw_height, args.prob_threshold)
+
 
         # Write video or image file
         if not image_flag:
             if args.toggle_video is "ON":
                 cv2.namedWindow('frame', cv2.WINDOW_NORMAL)
-                cv2.imshow('frame',f_frame)
+                cv2.imshow('frame',face_frame)
         else:
             ### TODO: Write an output image if `single_image_mode` ###
-            cv2.imwrite('output_image.jpg', f_frame)
+            cv2.imwrite('output_image.jpg', face_frame)
             print("Image saved sucessfully!")
 
     cv2.destroyAllWindows()
