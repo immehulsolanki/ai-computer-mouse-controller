@@ -27,8 +27,10 @@ from src.input_feeder import InputFeeder
 from src.face_detection import face_detection
 from src.head_pose_estimation import head_pose_estimation
 from src.facial_landmarks_detection import facial_landmarks_detection
+from src.gaze_estimation import gaze_estimation_model
+from src.mouse_controller import MouseController
 
-
+# var. result filtering for face detection with confidence value
 filtered_result_face_detection = [[]]
 
 # Initialize Log File, will save to current dir with datetime
@@ -70,12 +72,17 @@ def build_argparser():
     parser.add_argument("-pt_fld", "--prob_threshold_fld", type=float, default=0.5,
                         help="Probability threshold for facial_landmarks_detection filtering"
                         "(0.5 by default)")
+
+    parser.add_argument("-ge", "--ge", required=True, type=str,
+                        help="Path to an xml file of facial_landmarks_detection model.")
+    parser.add_argument("-pt_ge", "--prob_threshold_ge", type=float, default=0.5,
+                        help="Probability threshold for facial_landmarks_detection filtering"
+                        "(0.5 by default)")
     
-    
-    # three other remaining.
+    # other
     parser.add_argument("-i", "--input", required=True, type=str,
                         help="Path to image, video file or for webcam just type CAM")
-    parser.add_argument("-fps", "--fps", required=True, type=int,
+    parser.add_argument("-fps", "--fps", required=False, type=int,
                         help="FPS of Video or webcam, required to get perfect duration calculations.")
     parser.add_argument("-l", "--cpu_extension", required=False, type=str,
                         default=CPU_EXTENSION,
@@ -94,6 +101,10 @@ def build_argparser():
     parser.add_argument("-ci", "--cam_id", type=int, default=0,
                         help="input web Camera id"
                         "(0 by default)")
+
+    parser.add_argument("-sdo", "--show_debug_output", type=str, default="OFF",
+                        help="Toggle Video feed on or off [ON or OFF]"
+                        "(on by default)")
 
     # Facility not implemented
     # parser.add_argument("-wv", "--write_video", type=str, default="N",
@@ -144,7 +155,9 @@ def process_output_face_detection(input_frames_raw, result, input_frames_raw_wid
                 ymin = int(box[4] * input_frames_raw_height)
                 xmax = int(box[5] * input_frames_raw_width)
                 ymax = int(box[6] * input_frames_raw_height)
-                filtered_result_face_detection[i] = [xmin, ymin, xmax, ymax]
+                filtered_result_face_detection[i] = [xmin, ymin, xmax, ymax] # generate vector 
+
+                 
                 # label = "Person"+str(countmultipeople)
                 #Adding 30px to offset rectagle from ROI
                 cv2.rectangle(input_frames_raw, (xmin-30, ymin-30), (xmax+30, ymax+30), (0,0,255), 1) #main rect.
@@ -167,6 +180,13 @@ def infer(args):
 
     # Initial setup for facial landmars detection model
     facial_landmarks = facial_landmarks_detection(args.fld, args.device, args.cpu_extension)
+
+    # Initial setup for gaze_estimation
+    gaze_estimation = gaze_estimation_model(args.ge, args.device, args.cpu_extension)
+
+    # Initial setup Moouse controller 
+    mouse_auto = MouseController('high', 'fast')
+    log.info("Mouse controller initialized")
     
 
     # Open inputs 
@@ -196,6 +216,10 @@ def infer(args):
             exit()
 
         key_pressed = cv2.waitKey(1)
+        if key_pressed == 27:
+            log.info("program manually terminated")
+            print("program manually terminated")
+            exit()
 
         # get face detection results
         result_face_detection = detect_face.predict(input_frames_raw, input_frame_raw_width, input_frame_raw_height) #HxW
@@ -249,6 +273,19 @@ def infer(args):
         left_eye_roi = face_roi[left_eye_point_y-25:left_eye_point_y+25, left_eye_point_x-25:left_eye_point_x+25]
         right_eye_roi = face_roi[right_eye_point_y-25:right_eye_point_y+25, right_eye_point_x-25:right_eye_point_x+25 ]
 
+        # get the resul from gaze estimation model
+        result_gaze_estimation = gaze_estimation.predict(left_eye_roi, right_eye_roi, vector_yaw_pitch_roll)
+        # print("gaze estimation result shape: ",result_gaze_estimation.shape) # [1x3]
+        print("gaze estimation values",result_gaze_estimation)
+
+        # control the mouse
+        x = int(result_gaze_estimation[0][0] * left_eye_roi.shape[0])
+        y = int(result_gaze_estimation [0][1] * left_eye_roi.shape[0])
+        print("mouse value x,y: ", x,y)
+
+        # mouse_auto.move(0, 0)
+        # mouse_auto.move(result_gaze_estimation[0][0], result_gaze_estimation[0][1])
+
         # draw circle to eye points for model output visualization
         cv2.circle(face_roi, (left_eye_point_x,left_eye_point_y), 10, (0,255,255), 1) 
         cv2.circle(face_roi, (right_eye_point_x,right_eye_point_y), 10, (0,255,255), 1) 
@@ -259,18 +296,19 @@ def infer(args):
         cv2.rectangle(face_roi, (right_eye_point_x-30, right_eye_point_y-30), (right_eye_point_x+30, right_eye_point_y+30), (0,255,255), 1) #main rect.
 
         # Write video or image file
-        if not image_flag:
-            if args.toggle_video is "ON":
-                cv2.namedWindow('frame', cv2.WINDOW_NORMAL)
-                cv2.imshow('frame',face_frame)
+        if not image_flag and args.show_debug_output == 'ON':
+            # Visualization
+            cv2.namedWindow('input_feed', cv2.WINDOW_NORMAL)
+            cv2.imshow('input_feed',input_frames_raw)
 
-                cv2.namedWindow('lefteye', cv2.WINDOW_NORMAL)
-                cv2.imshow('lefteye',left_eye_roi)
-                cv2.namedWindow('righteye', cv2.WINDOW_NORMAL)
-                cv2.imshow('righteye',right_eye_roi)
+            cv2.namedWindow('lefteye', cv2.WINDOW_NORMAL)
+            cv2.imshow('lefteye',left_eye_roi)
 
-                cv2.namedWindow('frame1', cv2.WINDOW_NORMAL)
-                cv2.imshow('frame1',face_roi)
+            cv2.namedWindow('righteye', cv2.WINDOW_NORMAL)
+            cv2.imshow('righteye',right_eye_roi)
+
+            cv2.namedWindow('face_roi', cv2.WINDOW_NORMAL)
+            cv2.imshow('face_roi',face_roi)
         else:
             # Write an output image if single_image_mode 
             cv2.imwrite('output_image.jpg', face_frame)
@@ -295,15 +333,14 @@ def main():
     print("Model path_hpe:",args.hpe)
     print("Confidence_hpe:",args.prob_threshold_hpe)
     print("Model path_fld:",args.fld)
-    print("Confidence_fld:",args.prob_threshold_fld)
-
-    
+    print("Confidence_fld:",args.prob_threshold_fld)  
     print("Video/Image path:",args.input)
     print("Video fps:",args.fps)
     print("Device:",args.device)
     print("CPU Ext. path:",args.cpu_extension)
     print("Web cam ID(If any):",args.cam_id)
     print("Toggle video feed on/off:",args.toggle_video)
+    print("Show debug output screen:", args.show_debug_output)
     # print("Write output to video file Y or N:",args.write_video)
     print("-----------------------")
 
