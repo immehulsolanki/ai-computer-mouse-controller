@@ -1,7 +1,21 @@
 Start virtual invironment WINDOWS10
 venv_computer_pointer_control\Scripts\Activate
 
+
+== video ==
 python main.py --fps 10 --input bin\demo.mp4 --fd git_ign\models\face-detection-adas-binary-0001\FP32\face-detection-adas-binary-0001.xml --hpe git_ign\models\head-pose-estimation-adas-0001\FP32\head-pose-estimation-adas-0001.xml --fld git_ign\models\landmarks-regression-retail-0009\FP32\landmarks-regression-retail-0009.xml --ge git_ign\models\gaze-estimation-adas-0002\FP32\gaze-estimation-adas-0002.xml
 
 
 python main.py --fps 10 --input CAM --fd git_ign\models\face-detection-adas-binary-0001\FP32\face-detection-adas-binary-0001.xml --hpe git_ign\models\head-pose-estimation-adas-0001\FP32\head-pose-estimation-adas-0001.xml --fld git_ign\models\landmarks-regression-retail-0009\FP32\landmarks-regression-retail-0009.xml --ge git_ign\models\gaze-estimation-adas-0002\FP32\gaze-estimation-adas-0002.xml
+
+== CAM ===
+python main.py --fps 10 --input CAM --fd git_ign\models\face-detection-adas-binary-0001\FP32\face-detection-adas-binary-0001.xml --hpe git_ign\models\head-pose-estimation-adas-0001\FP32\head-pose-estimation-adas-0001.xml --fld git_ign\models\landmarks-regression-retail-0009\FP32\landmarks-regression-retail-0009.xml --ge git_ign\models\gaze-estimation-adas-0002\FP32\gaze-estimation-adas-0002.xml -sdo ON
+
+== video ==
+python main.py --fps 10 --input bin\demo.mp4 --fd git_ign\models\face-detection-adas-binary-0001\FP32\face-detection-adas-binary-0001.xml --hpe git_ign\models\head-pose-estimation-adas-0001\FP32\head-pose-estimation-adas-0001.xml --fld git_ign\models\landmarks-regression-retail-0009\FP32\landmarks-regression-retail-0009.xml --ge git_ign\models\gaze-estimation-adas-0002\FP32\gaze-estimation-adas-0002.xml -sdo ON
+
+==video FP16 ==
+python main.py --fps 10 --input bin\demo.mp4 --fd git_ign\models\face-detection-adas-binary-0001\FP32\face-detection-adas-binary-0001.xml --hpe git_ign\models\head-pose-estimation-adas-0001\FP16\head-pose-estimation-adas-0001.xml --fld git_ign\models\landmarks-regression-retail-0009\FP16\landmarks-regression-retail-0009.xml --ge git_ign\models\gaze-estimation-adas-0002\FP16\gaze-estimation-adas-0002.xml -sdo ON
+
+==video INT8 ==
+python main.py --fps 10 --input bin\demo.mp4 --fd git_ign\models\face-detection-adas-binary-0001\FP32\face-detection-adas-binary-0001.xml --hpe git_ign\models\head-pose-estimation-adas-0001\FP16\head-pose-estimation-adas-0001.xml --fld git_ign\models\landmarks-regression-retail-0009\FP16\landmarks-regression-retail-0009.xml --ge git_ign\models\gaze-estimation-adas-0002\INT8\gaze-estimation-adas-0002.xml -sdo ON

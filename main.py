@@ -156,8 +156,6 @@ def process_output_face_detection(input_frames_raw, result, input_frames_raw_wid
                 xmax = int(box[5] * input_frames_raw_width)
                 ymax = int(box[6] * input_frames_raw_height)
                 filtered_result_face_detection[i] = [xmin, ymin, xmax, ymax] # generate vector 
-
-                 
                 # label = "Person"+str(countmultipeople)
                 #Adding 30px to offset rectagle from ROI
                 cv2.rectangle(input_frames_raw, (xmin-30, ymin-30), (xmax+30, ymax+30), (0,0,255), 1) #main rect.
@@ -172,18 +170,36 @@ def infer(args):
     '''
     This function processes each model, run inference and controls the curser.
     '''
+    model_load_time = []
+    inference_time_fd = []
+    inference_time_hpe = []
+    inference_time_fld = []
+    inference_time_ge = []
+
     # Initial setup for face detection model
+    model_load_start_time_fd = (time.time() * 1000) # Timer for START
     detect_face = face_detection(args.fd, args.device, args.cpu_extension)
+    model_load_end_time_fd = (time.time() * 1000) - model_load_start_time_fd # Timer for END
+    model_load_time.append(model_load_end_time_fd)
 
     # Initial setup for head_pose_estimation model
+    model_load_start_time_hpe = (time.time() * 1000) # Timer for START
     head_pose_angles = head_pose_estimation(args.hpe, args.device, args.cpu_extension)
+    model_load_end_time_hpe = (time.time() * 1000) - model_load_start_time_hpe # Timer for END
+    model_load_time.append(model_load_end_time_hpe)
 
     # Initial setup for facial landmars detection model
+    model_load_start_time_fld = (time.time() * 1000) # Timer for START
     facial_landmarks = facial_landmarks_detection(args.fld, args.device, args.cpu_extension)
+    model_load_end_time_fld = (time.time() * 1000) - model_load_start_time_fld # Timer for END
+    model_load_time.append(model_load_end_time_fld)
 
     # Initial setup for gaze_estimation
+    model_load_start_time_ge = (time.time() * 1000) # Timer for START
     gaze_estimation = gaze_estimation_model(args.ge, args.device, args.cpu_extension)
-
+    model_load_end_time_ge = (time.time() * 1000) - model_load_start_time_ge # Timer for END
+    model_load_time.append(model_load_end_time_ge)
+  
     # Initial setup Moouse controller 
     mouse_auto = MouseController('high', 'fast')
     log.info("Mouse controller initialized")
@@ -210,19 +226,22 @@ def infer(args):
     for input_frames_raw in input_feeder.next_batch():
         frame_count += 1
         if input_frames_raw is None:
-            log.info("Input is currupted in run time, check for the issue")
+            log.info("Input is currupted in run time or batch finished, check for the issue")
             log.info("Last frame processed sucessfully no.: " + str(frame_count))
             print("Program stopped")
-            exit()
+            break
 
         key_pressed = cv2.waitKey(1)
         if key_pressed == 27:
             log.info("program manually terminated")
             print("program manually terminated")
-            exit()
+            break
 
         # get face detection results
+        inference_time_start_fd = (time.time() * 1000) # Timer for START
         result_face_detection = detect_face.predict(input_frames_raw, input_frame_raw_width, input_frame_raw_height) #HxW
+        inference_time_end_fd = (time.time() * 1000) - inference_time_start_fd # Timer for END
+        inference_time_fd.append(inference_time_end_fd)
 
         # get filtered result with prob threshold and draw on the raw frame
         face_frame, filtered_result_face_detection = process_output_face_detection(input_frames_raw, result_face_detection, input_frame_raw_width, input_frame_raw_height, args.prob_threshold_fd)
@@ -232,7 +251,10 @@ def infer(args):
             filtered_result_face_detection[0][0] - 20:filtered_result_face_detection[0][2] + 20]
 
         # get results of head pose estimation angles
+        inference_time_start_hpe = (time.time() * 1000) # Timer for START
         result_head_pose_estimation = head_pose_angles.predict(face_roi, face_roi.shape[1],face_roi.shape[0])
+        inference_time_end_hpe = (time.time() * 1000) - inference_time_start_hpe # Timer for END
+        inference_time_hpe.append(inference_time_end_hpe)
 
         # Extract information from respective blobs
         yaw = result_head_pose_estimation['angle_y_fc'][0][0]
@@ -245,14 +267,18 @@ def infer(args):
 
         # get result of facial landmark detection model
         # input is face roi only
+        inference_time_start_fld = (time.time() * 1000) # Timer for START
         result_facial_landmarks = facial_landmarks.predict(face_roi, face_roi.shape[1],face_roi.shape[0]) # HxW
+        inference_time_end_fld = (time.time() * 1000) - inference_time_start_fld # Timer for END
+        inference_time_fld.append(inference_time_end_fld)
+
         # print(result_facial_landmarks.shape) # get shape
         result_facial_landmarks = result_facial_landmarks[::,::,0,0] # slicing last two dim to 1x10
         # print(result_facial_landmarks) # print vector
         # print(result_facial_landmarks.shape) # get new shape
 
         # debug
-        print("eye coords raw: ",result_facial_landmarks[0][0], result_facial_landmarks[0][1],result_facial_landmarks[0][2],result_facial_landmarks[0][3])
+        # print("eye coords raw: ",result_facial_landmarks[0][0], result_facial_landmarks[0][1],result_facial_landmarks[0][2],result_facial_landmarks[0][3])
 
         # draw left eye and right eye
         left_eye_point_x = int(result_facial_landmarks[0][0] * face_roi.shape[1])
@@ -261,7 +287,7 @@ def infer(args):
         right_eye_point_y = int(result_facial_landmarks[0][3] * face_roi.shape[0])
 
         # debug
-        print("eye coords for roi px: ",left_eye_point_x, left_eye_point_y, right_eye_point_x, right_eye_point_y)
+        # print("eye coords for roi px: ",left_eye_point_x, left_eye_point_y, right_eye_point_x, right_eye_point_y)
         
         # doc for eyes coordinates
         # xmin = left_eye_point_x 
@@ -274,24 +300,27 @@ def infer(args):
         right_eye_roi = face_roi[right_eye_point_y-25:right_eye_point_y+25, right_eye_point_x-25:right_eye_point_x+25 ]
 
         # get the resul from gaze estimation model
+        inference_time_start_ge = (time.time() * 1000) # Timer for START
         result_gaze_estimation = gaze_estimation.predict(left_eye_roi, right_eye_roi, vector_yaw_pitch_roll)
+        inference_time_end_ge = (time.time() * 1000) - inference_time_start_ge # Timer for END
+        inference_time_ge.append(inference_time_end_ge)
         # print("gaze estimation result shape: ",result_gaze_estimation.shape) # [1x3]
-        print("gaze estimation values",result_gaze_estimation)
+        # print("gaze estimation values",result_gaze_estimation)
 
         # control the mouse
-        x = int(result_gaze_estimation[0][0] * left_eye_roi.shape[0])
-        y = int(result_gaze_estimation [0][1] * left_eye_roi.shape[0])
-        print("mouse value x,y: ", x,y)
+        # x = int(result_gaze_estimation[0][0] * left_eye_roi.shape[0])
+        # y = int(result_gaze_estimation [0][1] * left_eye_roi.shape[0])
+        # print("mouse value x,y: ", x,y)
 
         # mouse_auto.move(0, 0)
-        # mouse_auto.move(result_gaze_estimation[0][0], result_gaze_estimation[0][1])
+        mouse_auto.move(result_gaze_estimation[0][0], result_gaze_estimation[0][1])
 
         # draw circle to eye points for model output visualization
         cv2.circle(face_roi, (left_eye_point_x,left_eye_point_y), 10, (0,255,255), 1) 
         cv2.circle(face_roi, (right_eye_point_x,right_eye_point_y), 10, (0,255,255), 1) 
 
         # draw rectangle to get roi and visualization of eyes area 30px offset for slightly big rect.
-        print("eye coords for roi: ", left_eye_point_x, left_eye_point_y, right_eye_point_x, right_eye_point_y)
+        # print("eye coords for roi: ", left_eye_point_x, left_eye_point_y, right_eye_point_x, right_eye_point_y)
         cv2.rectangle(face_roi, (left_eye_point_x-30, left_eye_point_y-30), (left_eye_point_x+30, left_eye_point_y+30), (0,255,255), 1) #main rect.
         cv2.rectangle(face_roi, (right_eye_point_x-30, right_eye_point_y-30), (right_eye_point_x+30, right_eye_point_y+30), (0,255,255), 1) #main rect.
 
@@ -314,6 +343,28 @@ def infer(args):
             cv2.imwrite('output_image.jpg', face_frame)
             print("Image saved sucessfully!")
 
+    # Print stats
+    print("----- Bechmark results -----")
+    print("Model name: [fd, hpe, fld, ge]")
+    print("Model load time in ms: ",model_load_time)
+
+    print("[Min Max Avg.]")
+    log_inference_time_fd = np.array(inference_time_fd)
+    print("Inference time log for model face detection in ms:")
+    print([log_inference_time_fd.min(),log_inference_time_fd.max(),(float("{:.2f}".format(np.average(log_inference_time_fd))))])
+
+    log_inference_time_hpe = np.array(inference_time_hpe)
+    print("Inference time log for model head pose estimation in ms:")
+    print([log_inference_time_hpe.min(),log_inference_time_hpe.max(),(float("{:.2f}".format(np.average(log_inference_time_hpe))))])
+
+    log_inference_time_fld = np.array(inference_time_fld)
+    print("Inference time log for model facial landmark detection in ms:")
+    print([log_inference_time_fld.min(),log_inference_time_fld.max(),(float("{:.2f}".format(np.average(log_inference_time_fld))))])
+
+    log_inference_time_ge = np.array(inference_time_ge)
+    print("Inference time log for model gaze estimation in ms:")
+    print([log_inference_time_ge.min(),log_inference_time_ge.max(),(float("{:.2f}".format(np.average(log_inference_time_ge))))])
+
     cv2.destroyAllWindows()
 
 
@@ -334,6 +385,8 @@ def main():
     print("Confidence_hpe:",args.prob_threshold_hpe)
     print("Model path_fld:",args.fld)
     print("Confidence_fld:",args.prob_threshold_fld)  
+    print("Model path_ge:",args.ge)
+    print("Confidence_ge:",args.prob_threshold_ge)  
     print("Video/Image path:",args.input)
     print("Video fps:",args.fps)
     print("Device:",args.device)
