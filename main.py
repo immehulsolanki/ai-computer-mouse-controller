@@ -146,8 +146,8 @@ def process_output_face_detection(input_frames_raw, result, input_frames_raw_wid
                 ymax = int(box[6] * input_frames_raw_height)
                 filtered_result_face_detection[i] = [xmin, ymin, xmax, ymax]
                 # label = "Person"+str(countmultipeople)
-                #Adding 10px to offset rectagle from ROI
-                cv2.rectangle(input_frames_raw, (xmin-10, ymin-10), (xmax+10, ymax+10), (0,0,255), 1) #main rect.
+                #Adding 30px to offset rectagle from ROI
+                cv2.rectangle(input_frames_raw, (xmin-30, ymin-30), (xmax+30, ymax+30), (0,0,255), 1) #main rect.
                 # cv2.rectangle(input_frames_raw, (xmin, ymin), (xmin+90, ymin+10), (0,0,255), -1) # Text rect.
                 # cv2.putText(input_frames_raw, label, (xmin,ymin+10),cv2.FONT_HERSHEY_PLAIN, 0.8, (0,0,255), 1)
         #print (filtered_result_face_detection) # for debug
@@ -203,8 +203,9 @@ def infer(args):
         # get filtered result with prob threshold and draw on the raw frame
         face_frame, filtered_result_face_detection = process_output_face_detection(input_frames_raw, result_face_detection, input_frame_raw_width, input_frame_raw_height, args.prob_threshold_fd)
 
-        # get face ROI
-        face_roi = face_frame[filtered_result_face_detection[0][1]:filtered_result_face_detection[0][3], filtered_result_face_detection[0][0]:filtered_result_face_detection[0][2]]
+        # get face ROI and added 20px margin to crop slightly big roi [y1:y2, x1:x2]
+        face_roi = face_frame[filtered_result_face_detection[0][1] - 20 :filtered_result_face_detection[0][3] + 20, 
+            filtered_result_face_detection[0][0] - 20:filtered_result_face_detection[0][2] + 20]
 
         # get results of head pose estimation angles
         result_head_pose_estimation = head_pose_angles.predict(face_roi, face_roi.shape[1],face_roi.shape[0])
@@ -221,34 +222,52 @@ def infer(args):
         # get result of facial landmark detection model
         # input is face roi only
         result_facial_landmarks = facial_landmarks.predict(face_roi, face_roi.shape[1],face_roi.shape[0]) # HxW
-        print(result_facial_landmarks.shape)
+        # print(result_facial_landmarks.shape) # get shape
         result_facial_landmarks = result_facial_landmarks[::,::,0,0] # slicing last two dim to 1x10
-        print(result_facial_landmarks)
-        print(result_facial_landmarks.shape)
+        # print(result_facial_landmarks) # print vector
+        # print(result_facial_landmarks.shape) # get new shape
 
         # debug
-        print("eye coords: ",result_facial_landmarks[0][0], result_facial_landmarks[0][1],result_facial_landmarks[0][2],result_facial_landmarks[0][3])
+        print("eye coords raw: ",result_facial_landmarks[0][0], result_facial_landmarks[0][1],result_facial_landmarks[0][2],result_facial_landmarks[0][3])
 
         # draw left eye and right eye
         left_eye_point_x = int(result_facial_landmarks[0][0] * face_roi.shape[1])
         left_eye_point_y = int(result_facial_landmarks[0][1] * face_roi.shape[0])
         right_eye_point_x = int(result_facial_landmarks[0][2] * face_roi.shape[1])
         right_eye_point_y = int(result_facial_landmarks[0][3] * face_roi.shape[0])
-        
-        # draw circle to eye points for model output visualization
-        cv2.circle(face_roi, (left_eye_point_x,left_eye_point_y), 5, (0,255,255), 1) 
-        cv2.circle(face_roi, (right_eye_point_x,right_eye_point_y), 5, (0,255,255), 1) 
 
-        # draw rectangle to get roi and visualization of eyes aera
+        # debug
+        print("eye coords for roi px: ",left_eye_point_x, left_eye_point_y, right_eye_point_x, right_eye_point_y)
+        
+        # doc for eyes coordinates
+        # xmin = left_eye_point_x 
+        # ymin = left_eye_point_y
+        # xmax = right_eye_point_x
+        # ymax = right_eye_point_y
+
+        # Left and right eyes ROI for gaze estimation model
+        left_eye_roi = face_roi[left_eye_point_y-25:left_eye_point_y+25, left_eye_point_x-25:left_eye_point_x+25]
+        right_eye_roi = face_roi[right_eye_point_y-25:right_eye_point_y+25, right_eye_point_x-25:right_eye_point_x+25 ]
+
+        # draw circle to eye points for model output visualization
+        cv2.circle(face_roi, (left_eye_point_x,left_eye_point_y), 10, (0,255,255), 1) 
+        cv2.circle(face_roi, (right_eye_point_x,right_eye_point_y), 10, (0,255,255), 1) 
+
+        # draw rectangle to get roi and visualization of eyes area 30px offset for slightly big rect.
         print("eye coords for roi: ", left_eye_point_x, left_eye_point_y, right_eye_point_x, right_eye_point_y)
-        cv2.rectangle(face_roi, (left_eye_point_x-25, left_eye_point_y-25), (left_eye_point_x+25, left_eye_point_y+25), (0,255,255), 1) #main rect.
-        cv2.rectangle(face_roi, (right_eye_point_x-25, right_eye_point_y-25), (right_eye_point_x+25, right_eye_point_y+25), (0,255,255), 1) #main rect.
+        cv2.rectangle(face_roi, (left_eye_point_x-30, left_eye_point_y-30), (left_eye_point_x+30, left_eye_point_y+30), (0,255,255), 1) #main rect.
+        cv2.rectangle(face_roi, (right_eye_point_x-30, right_eye_point_y-30), (right_eye_point_x+30, right_eye_point_y+30), (0,255,255), 1) #main rect.
 
         # Write video or image file
         if not image_flag:
             if args.toggle_video is "ON":
                 cv2.namedWindow('frame', cv2.WINDOW_NORMAL)
                 cv2.imshow('frame',face_frame)
+
+                cv2.namedWindow('lefteye', cv2.WINDOW_NORMAL)
+                cv2.imshow('lefteye',left_eye_roi)
+                cv2.namedWindow('righteye', cv2.WINDOW_NORMAL)
+                cv2.imshow('righteye',right_eye_roi)
 
                 cv2.namedWindow('frame1', cv2.WINDOW_NORMAL)
                 cv2.imshow('frame1',face_roi)
