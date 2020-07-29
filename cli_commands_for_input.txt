@@ -1,4 +1,4 @@
-
+Start virtual invironment WINDOWS10
 venv_computer_pointer_control\Scripts\Activate
 
-python main.py --fps 10 --input bin\demo.mp4 --face git_ign\models\face-detection-adas-binary-0001\FP32\face-detection-adas-binary-0001.xml
+python main.py --fps 10 --input bin\demo.mp4 --fd git_ign\models\face-detection-adas-binary-0001\FP32\face-detection-adas-binary-0001.xml --hpe git_ign\models\head-pose-estimation-adas-0001\FP32\head-pose-estimation-adas-0001.xml --fld git_ign\models\landmarks-regression-retail-0009\FP32\landmarks-regression-retail-0009.xml

@@ -23,8 +23,11 @@ import numpy as np
 import logging as log
 import datetime
 from argparse import ArgumentParser
-from src.face_detection import face_detection
 from src.input_feeder import InputFeeder
+from src.face_detection import face_detection
+from src.head_pose_estimation import head_pose_estimation
+from src.facial_landmarks_detection import facial_landmarks_detection
+
 
 filtered_result_face_detection = [[]]
 
@@ -49,8 +52,26 @@ def build_argparser():
     :return: command line arguments
     """
     parser = ArgumentParser()
-    parser.add_argument("-face", "--face", required=True, type=str,
+    # Model related args.
+    parser.add_argument("-fd", "--fd", required=True, type=str,
                         help="Path to an xml file of face detection model.")
+    parser.add_argument("-pt_fd", "--prob_threshold_fd", type=float, default=0.5,
+                        help="Probability threshold for face detections filtering"
+                        "(0.5 by default)")
+
+    parser.add_argument("-hpe", "--hpe", required=True, type=str,
+                        help="Path to an xml file of head pose estimation model.")
+    parser.add_argument("-pt_hpe", "--prob_threshold_hpe", type=float, default=0.5,
+                        help="Probability threshold for head pose estimation filtering"
+                        "(0.5 by default)")
+
+    parser.add_argument("-fld", "--fld", required=True, type=str,
+                        help="Path to an xml file of facial_landmarks_detection model.")
+    parser.add_argument("-pt_fld", "--prob_threshold_fld", type=float, default=0.5,
+                        help="Probability threshold for facial_landmarks_detection filtering"
+                        "(0.5 by default)")
+    
+    
     # three other remaining.
     parser.add_argument("-i", "--input", required=True, type=str,
                         help="Path to image, video file or for webcam just type CAM")
@@ -66,15 +87,15 @@ def build_argparser():
                              "CPU, GPU, FPGA or MYRIAD is acceptable. Sample "
                              "will look for a suitable plugin for device "
                              "specified (CPU by default)")
-    parser.add_argument("-pt", "--prob_threshold", type=float, default=0.5,
-                        help="Probability threshold for detections filtering"
-                        "(0.5 by default)")
+    
     parser.add_argument("-tv", "--toggle_video", type=str, default="ON",
                         help="Toggle Video feed on or off [ON or OFF]"
                         "(on by default)")
     parser.add_argument("-ci", "--cam_id", type=int, default=0,
                         help="input web Camera id"
                         "(0 by default)")
+
+    # Facility not implemented
     # parser.add_argument("-wv", "--write_video", type=str, default="N",
     #                     help="write video to local file Y or N [Y or N]"
     #                     "(on by default)")
@@ -114,6 +135,7 @@ def check_input_type(input):
 def process_output_face_detection(input_frames_raw, result, input_frames_raw_width, input_frames_raw_height, prob_threshold):
         '''
         Process results and Draw bounding boxes onto the frame.
+        output [xmin, ymin, xmax, ymax]
         '''
         for i, box in enumerate(result[0][0]): # Output shape is 1x1x100x7
             conf = box[2]
@@ -122,13 +144,13 @@ def process_output_face_detection(input_frames_raw, result, input_frames_raw_wid
                 ymin = int(box[4] * input_frames_raw_height)
                 xmax = int(box[5] * input_frames_raw_width)
                 ymax = int(box[6] * input_frames_raw_height)
-                print(filtered_result_face_detection)
                 filtered_result_face_detection[i] = [xmin, ymin, xmax, ymax]
                 # label = "Person"+str(countmultipeople)
-                cv2.rectangle(input_frames_raw, (xmin, ymin), (xmax, ymax), (0,0,255), 1) #main rect.
+                #Adding 10px to offset rectagle from ROI
+                cv2.rectangle(input_frames_raw, (xmin-10, ymin-10), (xmax+10, ymax+10), (0,0,255), 1) #main rect.
                 # cv2.rectangle(input_frames_raw, (xmin, ymin), (xmin+90, ymin+10), (0,0,255), -1) # Text rect.
                 # cv2.putText(input_frames_raw, label, (xmin,ymin+10),cv2.FONT_HERSHEY_PLAIN, 0.8, (0,0,255), 1)
-        print (filtered_result_face_detection)
+        #print (filtered_result_face_detection) # for debug
         return input_frames_raw, filtered_result_face_detection
 
 
@@ -138,7 +160,13 @@ def infer(args):
     This function processes each model, run inference and controls the curser.
     '''
     # Initial setup for face detection model
-    detectFace = face_detection(args.face, args.device, args.cpu_extension)
+    detect_face = face_detection(args.fd, args.device, args.cpu_extension)
+
+    # Initial setup for head_pose_estimation model
+    head_pose_angles = head_pose_estimation(args.hpe, args.device, args.cpu_extension)
+
+    # Initial setup for facial landmars detection model
+    facial_landmarks = facial_landmarks_detection(args.fld, args.device, args.cpu_extension)
     
 
     # Open inputs 
@@ -169,19 +197,63 @@ def infer(args):
 
         key_pressed = cv2.waitKey(1)
 
-        # face roi
-        result_face_detection = detectFace.predict(input_frames_raw, input_frame_raw_width, input_frame_raw_height) #HxW
-        # get filtered result with prob threshold    
-        face_frame, filtered_result_face_detection = process_output_face_detection(input_frames_raw, result_face_detection, input_frame_raw_width, input_frame_raw_height, args.prob_threshold)
+        # get face detection results
+        result_face_detection = detect_face.predict(input_frames_raw, input_frame_raw_width, input_frame_raw_height) #HxW
 
+        # get filtered result with prob threshold and draw on the raw frame
+        face_frame, filtered_result_face_detection = process_output_face_detection(input_frames_raw, result_face_detection, input_frame_raw_width, input_frame_raw_height, args.prob_threshold_fd)
+
+        # get face ROI
+        face_roi = face_frame[filtered_result_face_detection[0][1]:filtered_result_face_detection[0][3], filtered_result_face_detection[0][0]:filtered_result_face_detection[0][2]]
+
+        # get results of head pose estimation angles
+        result_head_pose_estimation = head_pose_angles.predict(face_roi, face_roi.shape[1],face_roi.shape[0])
+
+        # Extract information from respective blobs
+        yaw = result_head_pose_estimation['angle_y_fc'][0][0]
+        pitch = result_head_pose_estimation['angle_p_fc'][0][0]
+        roll = result_head_pose_estimation['angle_r_fc'][0][0]
+        # print("output of head pose estimation angles are yaw, pitch, roll in degree: ",yaw, pitch, roll)
+
+        # generate [1x3] vector for gaze estimation model
+        vector_yaw_pitch_roll = [yaw, pitch, roll]
+
+        # get result of facial landmark detection model
+        # input is face roi only
+        result_facial_landmarks = facial_landmarks.predict(face_roi, face_roi.shape[1],face_roi.shape[0]) # HxW
+        print(result_facial_landmarks.shape)
+        result_facial_landmarks = result_facial_landmarks[::,::,0,0] # slicing last two dim to 1x10
+        print(result_facial_landmarks)
+        print(result_facial_landmarks.shape)
+
+        # debug
+        print("eye coords: ",result_facial_landmarks[0][0], result_facial_landmarks[0][1],result_facial_landmarks[0][2],result_facial_landmarks[0][3])
+
+        # draw left eye and right eye
+        left_eye_point_x = int(result_facial_landmarks[0][0] * face_roi.shape[1])
+        left_eye_point_y = int(result_facial_landmarks[0][1] * face_roi.shape[0])
+        right_eye_point_x = int(result_facial_landmarks[0][2] * face_roi.shape[1])
+        right_eye_point_y = int(result_facial_landmarks[0][3] * face_roi.shape[0])
+        
+        # draw circle to eye points for model output visualization
+        cv2.circle(face_roi, (left_eye_point_x,left_eye_point_y), 5, (0,255,255), 1) 
+        cv2.circle(face_roi, (right_eye_point_x,right_eye_point_y), 5, (0,255,255), 1) 
+
+        # draw rectangle to get roi and visualization of eyes aera
+        print("eye coords for roi: ", left_eye_point_x, left_eye_point_y, right_eye_point_x, right_eye_point_y)
+        cv2.rectangle(face_roi, (left_eye_point_x-25, left_eye_point_y-25), (left_eye_point_x+25, left_eye_point_y+25), (0,255,255), 1) #main rect.
+        cv2.rectangle(face_roi, (right_eye_point_x-25, right_eye_point_y-25), (right_eye_point_x+25, right_eye_point_y+25), (0,255,255), 1) #main rect.
 
         # Write video or image file
         if not image_flag:
             if args.toggle_video is "ON":
                 cv2.namedWindow('frame', cv2.WINDOW_NORMAL)
                 cv2.imshow('frame',face_frame)
+
+                cv2.namedWindow('frame1', cv2.WINDOW_NORMAL)
+                cv2.imshow('frame1',face_roi)
         else:
-            ### TODO: Write an output image if `single_image_mode` ###
+            # Write an output image if single_image_mode 
             cv2.imwrite('output_image.jpg', face_frame)
             print("Image saved sucessfully!")
 
@@ -199,12 +271,18 @@ def main():
     args = build_argparser().parse_args()
     print("Commandline Arguments received")
     print("-----Information-----")
-    print("Model path:",args.face)
+    print("Model path_fd:",args.fd)
+    print("Confidence_fd:",args.prob_threshold_fd)
+    print("Model path_hpe:",args.hpe)
+    print("Confidence_hpe:",args.prob_threshold_hpe)
+    print("Model path_fld:",args.fld)
+    print("Confidence_fld:",args.prob_threshold_fld)
+
+    
     print("Video/Image path:",args.input)
     print("Video fps:",args.fps)
     print("Device:",args.device)
     print("CPU Ext. path:",args.cpu_extension)
-    print("Confidence:",args.prob_threshold)
     print("Web cam ID(If any):",args.cam_id)
     print("Toggle video feed on/off:",args.toggle_video)
     # print("Write output to video file Y or N:",args.write_video)

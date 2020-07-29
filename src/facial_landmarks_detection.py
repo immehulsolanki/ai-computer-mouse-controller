@@ -17,52 +17,41 @@ limitations under the License.
 
 """ Model Information """
 """
-This class implemented to work with face dection model. Refere following parameters to integrate or modify it.
-
-Name: face-detection-adas-binary-0001
+landmarks-regression-retail-0009
 
 Specification
 METRIC	VALUE
-AP (head height >10px)	31.2%
-AP (head height >32px)	76.2%
-AP (head height >64px)	90.3%
-AP (head height >100px)	91.9%
-Min head size	90x90 pixels on 1080p
-GFlops	0.611
-GI1ops	2.224
-MParams	1.053
+Mean Normed Error (on VGGFace2)	0.0705
+Face location requirements	Tight crop
+GFlops	0.021
+MParams	0.191
 Source framework	PyTorch*
 
 Inputs
-Name: input, shape: [1x3x384x672] - An input image in the format [BxCxHxW], where:
+Name: "data" , shape: [1x3x48x48] - An input image in the format [BxCxHxW], where:
 
 B - batch size
 C - number of channels
 H - image height
 W - image width
-Expected color order is BGR.
+The expected color order is BGR.
 
 Outputs
-The net outputs blob with shape: [1, 1, N, 7], where N is the number of detected bounding boxes. Each detection has the format [image_id, label, conf, x_min, y_min, x_max, y_max], where:
-
-image_id - ID of the image in the batch
-label - predicted class ID
-conf - confidence for the predicted class
-(x_min, y_min) - coordinates of the top left bounding box corner
-(x_max, y_max) - coordinates of the bottom right bounding box corner.
+The net outputs a blob with the shape: [1, 10], containing a row-vector of 10 floating point values for five landmarks coordinates in the form (x0, y0, x1, y1, ..., x5, y5). All the coordinates are normalized to be in range [0,1].
 
 Legal Information
-ref: https://docs.openvinotoolkit.org/latest/omz_models_intel_face_detection_adas_binary_0001_description_face_detection_adas_binary_0001.html
+ref:https://docs.openvinotoolkit.org/latest/omz_models_intel_landmarks_regression_retail_0009_description_landmarks_regression_retail_0009.html
 """
+
 import os
 import sys
 import logging as log
 import cv2
 from openvino.inference_engine import IENetwork, IECore
 
-class face_detection:
+class facial_landmarks_detection:
     '''
-    Class for the Face Detection Model.
+    Class for the facial_landmarks_detection.
     '''
     def __init__(self, model, device='CPU', extensions=None):
         '''
@@ -83,7 +72,7 @@ class face_detection:
         self.filtered_result = [[]]
 
         # ====== Load model files, verify model, and get the input shap parameters at start ======
-        log.info("<---------- class Facedetection model --------->")
+        log.info("<---------- class facial_landmark_detection model --------->")
         self.load_model()
         self.check_model()
         self.network_input_shape = self.get_input_shape()
@@ -179,8 +168,8 @@ class face_detection:
         '''
         ### Get the input layer informations ###
         log.info("-----Accessing input layer information-----")
-        log.info('Face detection model Network input layers = ' + str(list(self.network.inputs)))
-        log.info('Face detection model Network input layers type: '+ str(type(self.network.inputs)))
+        log.info('facial_landmarks_detection model Network input layers = ' + str(list(self.network.inputs)))
+        log.info('facial_landmarks_detection Network input layers type: '+ str(type(self.network.inputs)))
         self.input_blob = next(iter(self.network.inputs))#Origional
         log.info("-------------------------------")
         return self.network.inputs[self.input_blob].shape #Origional
@@ -220,10 +209,13 @@ class face_detection:
         self.exec_network.start_async(request_id=0, #Origional
                 inputs={self.input_blob: p_frame}) # run inference
 
+        # # Run sync inference
+        # self.exec_network.infer({self.input_blob: p_frame}) # run inference
+
         # wait until result available        
         if self.wait() == 0:
             ### the results of the inference request ###
-            blob, result = self.get_output()
+            blob, result = self.get_output() # origioinal for single blob outputs
 
             # Print available blob infirmation
             blob_list = []
@@ -231,6 +223,6 @@ class face_detection:
                 self.print_once = False
                 for name, output_ in blob.items(): #Find the possible BLOBS for name, 
                     blob_list.append(name)
-                log.info("The name of available blob of face detection model is: " + str(blob_list))
+                log.info("The name of available blob of facial_landmarks_detection model is: " + str(blob_list))
        
             return result
