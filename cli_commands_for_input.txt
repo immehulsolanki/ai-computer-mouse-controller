@@ -1,0 +1,4 @@
+
+venv_computer_pointer_control\Scripts\Activate
+
+python main.py --fps 10 --input bin\demo.mp4 --face git_ign\models\face-detection-adas-binary-0001\FP32\face-detection-adas-binary-0001.xml

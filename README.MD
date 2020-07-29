@@ -1,3 +1,11 @@
+# External Dependencies other than OpenVino
+
+argparse
+Numpy
+Pyautogui
+pylint
+opencv-python > v3.xxx
+
 # Computer Pointer Controller
 
 *TODO:* Write a short introduction to your project
