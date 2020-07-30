@@ -165,7 +165,7 @@ similarly you can define probability threshold explicitly.
 
 ## Benchmarks:
 
-Benchmark was performed on loca system:
+Benchmark was performed on local system with following specification:
 - OS: Windows 10 V2004
 - CPU: Intel I7 4790 @2.8Ghz
 - RAM: 8GB
@@ -198,9 +198,6 @@ head-pose-estimation-adas-0001 |  N/A |  N/A
 landmarks-regression-retail-0009 |  N/A |  N/A
 gaze-estimation-adas-0002 |  189.994 | [0.0, 15.63, 3.93]
 
-## Results
-*TODO:* Discuss the benchmark results and explain why you are getting the results you are getting. For instance, explain why there is difference in inference time for FP32, FP16 and INT8 models.
-
 ### Edge Cases
 - This project can be utilized to identigy and alert sleeping drivers in trucks, cars and buses etc.
-- This project can be deployed on edge if proper hardware selected which is optimized for FP16 based model. Since requirement of face detection can also be fulfilled with other alogrith for faster outputs and then feed the roi to next three model which are edge friendly.
+- This project can be deployed on edge if proper hardware selected which is optimized for FP16 based model. Since requirement of face detection can also be fulfilled with other alogrithms for faster outputs and then feed the roi to next three model which are edge friendly.
